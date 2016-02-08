@@ -12,56 +12,28 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from mock import MagicMock
-from mock import patch
-import os
-
+import mock
 from neutron.tests import base
-from oslo_log import log as logging
 
-from networking_nec.plugins.necnwa.l2.rpc.nwa_agent_api import NECNWAAgentApi
-from networking_nec.plugins.necnwa.l2.rpc.nwa_proxy_api import NECNWAProxyApi
-
-LOG = logging.getLogger(__name__)
-ROOTDIR = '/'
-ETCDIR = os.path.join(ROOTDIR, 'etc/neutron')
-
-
-class TestNECNWAAgentApi(base.BaseTestCase):
-
-    @patch('neutron.common.rpc.get_client')
-    def setUp(self, f1):
-        super(TestNECNWAAgentApi, self).setUp()
-        self.proxy = NECNWAAgentApi("dummy-topic")
-        self.context = MagicMock()
-
-    def test_create_server(self):
-        tenant_id = '844eb55f21e84a289e9c22098d387e5d'
-        self.proxy.create_server(self.context, tenant_id)
-
-    def test_delete_server(self):
-        tenant_id = '844eb55f21e84a289e9c22098d387e5d'
-        self.proxy.delete_server(self.context, tenant_id)
-
-    def test_get_nwa_rpc_servers(self):
-        self.proxy.get_nwa_rpc_servers(self.context)
+from networking_nec.plugins.necnwa.l2.rpc import nwa_proxy_api
 
 
 class TestNECNWAProxyApi(base.BaseTestCase):
 
-    @patch('neutron.common.rpc.get_client')
+    @mock.patch('neutron.common.rpc.get_client')
     def setUp(self, f1):
         super(TestNECNWAProxyApi, self).setUp()
-        self.proxy = NECNWAProxyApi("dummy-topic", "dummy-tenant-id")
-        self.context = MagicMock()
+        self.proxy = nwa_proxy_api.NECNWAProxyApi("dummy-topic",
+                                                  "dummy-tenant-id")
+        self.context = mock.MagicMock()
 
     def test__send_msg_true(self):
-        msg = MagicMock()
+        msg = mock.MagicMock()
         blocking = True
         self.proxy._send_msg(self.context, msg, blocking)
 
     def test__send_msg_false(self):
-        msg = MagicMock()
+        msg = mock.MagicMock()
         blocking = False
         self.proxy._send_msg(self.context, msg, blocking)
 

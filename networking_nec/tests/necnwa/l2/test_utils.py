@@ -22,9 +22,7 @@ from oslo_log import log as logging
 from oslo_serialization import jsonutils
 
 from networking_nec.plugins.necnwa.common import config
-from networking_nec.plugins.necnwa.common import utils as nwa_com_utils
 from networking_nec.plugins.necnwa.l2 import utils as nwa_l2_utils
-from networking_nec.plugins.necnwa.l3 import utils as nwa_l3_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -160,13 +158,6 @@ class TestNwa(base.BaseTestCase):
             }
         }
         self.rcode = MagicMock()
-
-
-class TestGetTenantInfo(TestNwa):
-    def test_get_tenant_info(self):
-        tid, nid = nwa_com_utils.get_tenant_info(self.context)
-        self.assertEqual(tid, 'T1')
-        self.assertEqual(nid, 'RegionOneT1')
 
 
 class TestGetNetworkInfo(TestNwa):
@@ -570,30 +561,3 @@ class TestNwaDeleteGeneralDev(TestNwa):
         ]
         for param in test_params:
             yield self.check_nwa_delete_general_dev_bm, param
-
-
-class TestAddRouterInterfaceByPort(TestNwa):
-
-    def test_add_router_interface_by_port(self):
-        context = MagicMock()
-        router_id = MagicMock()
-        interface_info = {'port_id': '0a08ca7b-51fb-4d0b-8483-e93bb6d47bda'}
-
-        plugin = MagicMock()
-        plugin._core_plugin = MagicMock()
-        proxy = MagicMock()
-        create_tenant_fw = MagicMock()
-        proxy.create_tenant_fw = create_tenant_fw
-        plugin._core_plugin.get_nwa_proxy = MagicMock(return_value=proxy)
-
-        nwa_l3_utils.add_router_interface_by_port(
-            plugin, context, router_id, interface_info
-        )
-        self.assertEqual(create_tenant_fw.call_count, 1)
-
-        create_tenant_fw.reset_mock()
-        plugin._core_plugin.get_nwa_proxy.side_effect = Exception
-        nwa_l3_utils.add_router_interface_by_port(
-            plugin, context, router_id, interface_info
-        )
-        self.assertEqual(create_tenant_fw.call_count, 0)
