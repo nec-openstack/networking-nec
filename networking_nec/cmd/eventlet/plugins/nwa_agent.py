@@ -3,7 +3,7 @@
 
 import sys
 
-from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent import main
+from networking_nec.plugins.necnwa.agent.nwa_agent import main
 
 
 if __name__ == "__main__":

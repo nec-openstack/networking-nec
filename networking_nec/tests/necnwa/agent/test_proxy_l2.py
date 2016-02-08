@@ -18,14 +18,13 @@ import mock
 
 from networking_nec.plugins.necnwa.agent import proxy_l2
 from networking_nec.tests.necnwa.agent import test_data
-from networking_nec.tests.necnwa.agent import test_necnwa_neutron_agent
+from networking_nec.tests.necnwa.agent import test_nwa_agent
 
 # TODO(amotoki): Clean up this
 proxy_l2.WAIT_AGENT_NOTIFIER = 0
 
 
-class TestNECNWANeutronAgentAsNwaClient(
-        test_necnwa_neutron_agent.TestNECNWANeutronAgentBase):
+class TestAgentProxyL2(test_nwa_agent.TestNECNWANeutronAgentBase):
 
     def test__create_tenant_nw_fail(self):
         tenant_id = '844eb55f21e84a289e9c22098d387e5d'
@@ -596,8 +595,7 @@ def test_check_segment():
     proxy_l2.check_segment(network_id, nwa_data)
 
 
-class TestNECNWANeutronAgentRpc(
-        test_necnwa_neutron_agent.TestNECNWANeutronAgentBase):
+class TestNECNWANeutronAgentRpc(test_nwa_agent.TestNECNWANeutronAgentBase):
 
     # ### GeneralDev: None
     # ### add Openstack/DC/HA1

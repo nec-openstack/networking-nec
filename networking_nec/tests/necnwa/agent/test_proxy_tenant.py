@@ -14,11 +14,10 @@
 
 import mock
 
-from networking_nec.tests.necnwa.agent import test_necnwa_neutron_agent
+from networking_nec.tests.necnwa.agent import test_nwa_agent
 
 
-class TestNECNWANeutronAgentAsNwaClient(
-        test_necnwa_neutron_agent.TestNECNWANeutronAgentBase):
+class TestAgentProxyTenant(test_nwa_agent.TestNECNWANeutronAgentBase):
 
     def test__create_tenant_succeed(self):
         nwa_tenant_id = 'DC1_844eb55f21e84a289e9c22098d387e5d'

@@ -27,7 +27,7 @@ from oslo_log import log as logging
 import networking_nec
 NECNWA_INI = (networking_nec.__path__[0] +
               '/../etc/neutron/plugins/nec/necnwa.ini')
-from networking_nec.plugins.necnwa.agent import necnwa_neutron_agent
+from networking_nec.plugins.necnwa.agent import nwa_agent
 
 LOG = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class TestNECNWANeutronAgentBase(base.BaseTestCase):
         self._patch_nwa_client()
         self._config_parse()
         self.context = MagicMock()
-        self.agent = necnwa_neutron_agent.NECNWANeutronAgent(10)
+        self.agent = nwa_agent.NECNWANeutronAgent(10)
         rpc.init(cfg.ConfigOpts())
 
     def _patch_nwa_client(self):
@@ -118,8 +118,8 @@ class TestNECNWANeutronAgentAsNwaClient(TestNECNWANeutronAgentBase):
         )
 
 
-@patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent')  # noqa
+@patch('networking_nec.plugins.necnwa.agent.nwa_agent.NECNWANeutronAgent')  # noqa
 @patch('neutron.common.config')
 @patch('sys.argv')
 def test_main(f1, f2, f3):
-    necnwa_neutron_agent.main()
+    nwa_agent.main()
