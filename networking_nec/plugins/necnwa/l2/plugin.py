@@ -27,7 +27,7 @@ from oslo_log import log as logging
 
 from networking_nec._i18n import _LI, _LW
 from networking_nec.plugins.necnwa.agent import necnwa_agent_rpc
-from networking_nec.plugins.necnwa.db import api as necnwa_api
+from networking_nec.plugins.necnwa.l2 import db_api as necnwa_api
 from networking_nec.plugins.necnwa.l2.rpc import ml2_server_callback
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_callback
 

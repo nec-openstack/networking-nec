@@ -27,7 +27,7 @@ from oslo_serialization import jsonutils
 
 from networking_nec._i18n import _LW, _LE
 from networking_nec.plugins.necnwa.common import config
-from networking_nec.plugins.necnwa.db import api as nwa_db
+from networking_nec.plugins.necnwa.l2 import db_api as nwa_db
 from networking_nec.plugins.necnwa import necnwa_utils as nwa_utils
 
 LOG = logging.getLogger(__name__)

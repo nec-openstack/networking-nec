@@ -254,7 +254,7 @@ class TestNECNWAServerRpcCallbacks(base.BaseTestCase):
         self.assertIsInstance(device, dict)
 
     @patch('neutron.plugins.ml2.plugin.Ml2Plugin.update_port_status')
-    @patch('networking_nec.plugins.necnwa.db.api.ensure_port_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.ensure_port_binding')
     @patch('neutron.plugins.ml2.db.get_network_segments')
     @patch('neutron.db.api.get_session')
     @patch('networking_nec.plugins.necnwa.l2.plugin.'
@@ -283,7 +283,7 @@ class TestNECNWAServerRpcCallbacks(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.plugin.'
            'NECNWAL2Plugin.update_port_status')
-    @patch('networking_nec.plugins.necnwa.db.api.ensure_port_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.ensure_port_binding')
     @patch('neutron.plugins.ml2.db.get_network_segments')
     @patch('neutron.db.api.get_session')
     @patch('networking_nec.plugins.necnwa.l2.plugin.'
@@ -310,7 +310,7 @@ class TestNECNWAServerRpcCallbacks(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.plugin.'
            'NECNWAL2Plugin.update_port_status')
-    @patch('networking_nec.plugins.necnwa.db.api.ensure_port_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.ensure_port_binding')
     @patch('neutron.plugins.ml2.db.get_network_segments')
     @patch('neutron.db.api.get_session')
     @patch('networking_nec.plugins.necnwa.l2.plugin.'

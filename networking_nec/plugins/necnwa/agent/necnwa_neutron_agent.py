@@ -36,7 +36,7 @@ from oslo_service import loopingcall
 from networking_nec._i18n import _LE, _LI, _LW
 from networking_nec.plugins.necnwa.agent import necnwa_agent_rpc
 from networking_nec.plugins.necnwa.common import config
-import networking_nec.plugins.necnwa.constants as nwa_const
+import networking_nec.plugins.necnwa.common.constants as nwa_const
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_api
 from networking_nec.plugins.necnwa.nwalib import client as nwa_cli
 

@@ -387,8 +387,8 @@ class test__releaseDynamicSegment(TestNwa):
 
 
 class test__setSegmentToTenantBinding(TestNwa):
-    @patch('networking_nec.plugins.necnwa.db.api.set_nwa_tenant_binding')
-    @patch('networking_nec.plugins.necnwa.db.api.get_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.set_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.get_nwa_tenant_binding')
     def test__set_segment_to_tenant_binding(self, gntb, sntb):
         self.rcode.value_json = {}
         gntb.return_value = self.rcode
@@ -397,8 +397,8 @@ class test__setSegmentToTenantBinding(TestNwa):
         self.assertEqual(gntb.call_count, 1)
         self.assertEqual(sntb.call_count, 1)
 
-    @patch('networking_nec.plugins.necnwa.db.api.set_nwa_tenant_binding')
-    @patch('networking_nec.plugins.necnwa.db.api.get_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.set_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.get_nwa_tenant_binding')
     def test__set_segment_to_tenant_binding_set_false(self, gntb, sntb):
         self.rcode.value_json = {}
         gntb.return_value = self.rcode
@@ -409,8 +409,8 @@ class test__setSegmentToTenantBinding(TestNwa):
 
 
 class test__setGeneralDevToTenantBinding(TestNwa):
-    @patch('networking_nec.plugins.necnwa.db.api.set_nwa_tenant_binding')
-    @patch('networking_nec.plugins.necnwa.db.api.get_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.set_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.get_nwa_tenant_binding')
     def test__set_general_dev_to_tenant_binding(self, gntb, sntb):
         gntb.return_value = self.rcode
         sntb.return_value = True

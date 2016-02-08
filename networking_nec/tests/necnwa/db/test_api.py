@@ -19,25 +19,28 @@ from sqlalchemy.orm.exc import NoResultFound
 from neutron.tests import base
 from oslo_log import log as logging
 
-from networking_nec.plugins.necnwa.db.api import add_nwa_tenant_binding
-from networking_nec.plugins.necnwa.db.api import chg_value
-from networking_nec.plugins.necnwa.db.api import del_nwa_tenant_binding
-from networking_nec.plugins.necnwa.db.api import ensure_port_binding
-from networking_nec.plugins.necnwa.db.api import get_nwa_tenant_binding
-from networking_nec.plugins.necnwa.db.api import get_nwa_tenant_binding_by_tid
-from networking_nec.plugins.necnwa.db.api import set_nwa_tenant_binding
-from networking_nec.plugins.necnwa.db.api import update_json_nwa_tenant_id
-from networking_nec.plugins.necnwa.db.api \
+from networking_nec.plugins.necnwa.l2.db_api import add_nwa_tenant_binding
+from networking_nec.plugins.necnwa.l2.db_api import chg_value
+from networking_nec.plugins.necnwa.l2.db_api import del_nwa_tenant_binding
+from networking_nec.plugins.necnwa.l2.db_api import ensure_port_binding
+from networking_nec.plugins.necnwa.l2.db_api import get_nwa_tenant_binding
+from networking_nec.plugins.necnwa.l2.db_api \
+    import get_nwa_tenant_binding_by_tid
+from networking_nec.plugins.necnwa.l2.db_api import set_nwa_tenant_binding
+from networking_nec.plugins.necnwa.l2.db_api import update_json_nwa_tenant_id
+from networking_nec.plugins.necnwa.l2.db_api \
     import update_json_post_CreateGeneralDev
-from networking_nec.plugins.necnwa.db.api \
+from networking_nec.plugins.necnwa.l2.db_api \
     import update_json_post_CreateTenantFW
-from networking_nec.plugins.necnwa.db.api \
+from networking_nec.plugins.necnwa.l2.db_api \
     import update_json_post_CreateTenantNW
-from networking_nec.plugins.necnwa.db.api import update_json_post_CreateVLAN
-from networking_nec.plugins.necnwa.db.api import update_json_post_SettingNAT
-from networking_nec.plugins.necnwa.db.api \
+from networking_nec.plugins.necnwa.l2.db_api \
+    import update_json_post_CreateVLAN
+from networking_nec.plugins.necnwa.l2.db_api \
+    import update_json_post_SettingNAT
+from networking_nec.plugins.necnwa.l2.db_api \
     import update_json_post_UpdateTenantFW
-from networking_nec.plugins.necnwa.db.api import update_json_vlanid
+from networking_nec.plugins.necnwa.l2.db_api import update_json_vlanid
 
 LOG = logging.getLogger(__name__)
 
@@ -167,7 +170,7 @@ class TestGetNwaTenantBindingByTid(base.BaseTestCase):
 
 
 class TestSetNwaTenantBinding(base.BaseTestCase):
-    @patch('networking_nec.plugins.necnwa.db.api.get_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.get_nwa_tenant_binding')
     def check_set_nwa_tenant_binding(self, param, gntb):
         self.session = MagicMock()
         gntb.return_value = param['old_value_json']
@@ -268,7 +271,7 @@ class TestSetNwaTenantBinding(base.BaseTestCase):
 
 
 class TestDelNwaTenantBinding(base.BaseTestCase):
-    @patch('networking_nec.plugins.necnwa.db.api.get_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.get_nwa_tenant_binding')
     def check_del_nwa_tenant_binding(self, param, gntb):
         self.session = MagicMock()
         gntb.return_value = param['old_value_json']
@@ -289,7 +292,7 @@ class TestDelNwaTenantBinding(base.BaseTestCase):
         for param in test_params:
             yield self.check_del_nwa_tenant_binding, param
 
-    @patch('networking_nec.plugins.necnwa.db.api.get_nwa_tenant_binding')
+    @patch('networking_nec.plugins.necnwa.l2.db_api.get_nwa_tenant_binding')
     def test_del_nwa_tenant_binding_no_result_found(self, gntb):
         gntb.return_value = 1
         self.session = MagicMock()

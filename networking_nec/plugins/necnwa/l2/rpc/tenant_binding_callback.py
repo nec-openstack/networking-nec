@@ -24,7 +24,7 @@ from oslo_serialization import jsonutils
 from sqlalchemy.orm import exc as sa_exc
 
 from networking_nec._i18n import _LE, _LI
-from networking_nec.plugins.necnwa.db import api as necnwa_api
+from networking_nec.plugins.necnwa.l2 import db_api as necnwa_api
 
 LOG = logging.getLogger(__name__)
 

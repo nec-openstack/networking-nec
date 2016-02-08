@@ -23,7 +23,7 @@ from neutron.plugins.ml2 import rpc
 from oslo_log import log as logging
 
 from networking_nec._i18n import _LW
-from networking_nec.plugins.necnwa.db import api as necnwa_api
+from networking_nec.plugins.necnwa.l2 import db_api as necnwa_api
 
 LOG = logging.getLogger(__name__)
 

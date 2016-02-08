@@ -15,7 +15,7 @@
 import os
 import os.path
 
-from networking_nec.plugins.necnwa.db import api as nwa_api
+from networking_nec.plugins.necnwa.l2 import db_api as nwa_api
 
 from neutron.common import config
 from neutron import context
