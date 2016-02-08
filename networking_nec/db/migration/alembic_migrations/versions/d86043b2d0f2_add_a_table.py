@@ -16,14 +16,14 @@
 """Add tables for necnwa
 
 Revision ID: d86043b2d0f2
-Revises: kilo
+Revises: 978466bef2fe
 Create Date: 2016-01-12 14:36:11.217570
 
 """
 
 # revision identifiers, used by Alembic.
 revision = 'd86043b2d0f2'
-down_revision = None
+down_revision = '978466bef2fe'
 
 from alembic import op
 import sqlalchemy as sa
