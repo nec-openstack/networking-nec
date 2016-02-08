@@ -28,7 +28,7 @@ NECNWA_INI = (networking_nec.__path__[0] +
               '/../etc/neutron/plugins/nec/necnwa.ini')
 from networking_nec.plugins.necnwa.common import config
 import networking_nec.plugins.necnwa.common.constants as nwa_const
-from networking_nec.plugins.necnwa.ml2.drivers import mech_necnwa as mech
+from networking_nec.plugins.necnwa.l2.drivers import mech_necnwa as mech
 
 LOG = logging.getLogger(__name__)
 
