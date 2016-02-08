@@ -37,7 +37,7 @@ from networking_nec._i18n import _LE, _LI, _LW
 from networking_nec.plugins.necnwa.agent import necnwa_agent_rpc
 from networking_nec.plugins.necnwa.common import config
 import networking_nec.plugins.necnwa.constants as nwa_const
-from networking_nec.plugins.necnwa import necnwa_core_plugin
+from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_api
 from networking_nec.plugins.necnwa.nwalib import client as nwa_cli
 
 
@@ -187,7 +187,7 @@ class NECNWANeutronAgent(object):
 
         self.context = q_context.get_admin_context_without_session()
 
-        self.nwa_core_rpc = necnwa_core_plugin.NECNWATenantBindingServerRpcApi(
+        self.nwa_l2_rpc = tenant_binding_api.TenantBindingServerRpcApi(
             topics.PLUGIN
         )
 
@@ -293,7 +293,7 @@ class NECNWANeutronAgent(object):
             self.agent_state.pop('start_flag', None)
 
             servers = [{'tenant_id': tid} for tid in self.rpc_servers.keys()]
-            self.nwa_core_rpc.update_tenant_rpc_servers(
+            self.nwa_l2_rpc.update_tenant_rpc_servers(
                 self.context, servers
             )
 
@@ -488,7 +488,7 @@ class NECNWANeutronAgent(object):
             nwa_data.pop(vp_net + '_VlanID')
             nwa_data.pop(vp_net + '_CreateVlan')
 
-            self.nwa_core_rpc.release_dynamic_segment_from_agent(
+            self.nwa_l2_rpc.release_dynamic_segment_from_agent(
                 context, physical_network,
                 network_id
             )
@@ -526,7 +526,7 @@ class NECNWANeutronAgent(object):
             tenant_id, network_id, device_owner
         ))
 
-        nwa_data = self.nwa_core_rpc.get_nwa_tenant_binding(
+        nwa_data = self.nwa_l2_rpc.get_nwa_tenant_binding(
             context, tenant_id, nwa_tenant_id
         )
 
@@ -624,7 +624,7 @@ class NECNWANeutronAgent(object):
                    api.NETWORK_TYPE: n_constants.TYPE_VLAN,
                    api.SEGMENTATION_ID: vlan_id}
 
-        self.nwa_core_rpc.update_port_state_with_notifier(
+        self.nwa_l2_rpc.update_port_state_with_notifier(
             context, device_id, self.agent_id, port_id, segment, network_id
         )
 
@@ -723,7 +723,7 @@ class NECNWANeutronAgent(object):
         network_id = nwa_info['network']['id']
         resource_group_name = nwa_info['resource_group_name']
 
-        nwa_data = self.nwa_core_rpc.get_nwa_tenant_binding(
+        nwa_data = self.nwa_l2_rpc.get_nwa_tenant_binding(
             context, tenant_id, nwa_tenant_id
         )
 
@@ -832,7 +832,7 @@ class NECNWANeutronAgent(object):
 
         # delete nwa_tenant binding.
         LOG.info(_LI("delete_nwa_tenant_binding"))
-        return self.nwa_core_rpc.delete_nwa_tenant_binding(
+        return self.nwa_l2_rpc.delete_nwa_tenant_binding(
             context, tenant_id, nwa_tenant_id
         )
 
@@ -921,11 +921,11 @@ class NECNWANeutronAgent(object):
             sort_keys=True
         ))
         if nwa_created is True:
-            return self.nwa_core_rpc.add_nwa_tenant_binding(
+            return self.nwa_l2_rpc.add_nwa_tenant_binding(
                 context, tenant_id, nwa_tenant_id, nwa_data
             )
 
-        return self.nwa_core_rpc.set_nwa_tenant_binding(
+        return self.nwa_l2_rpc.set_nwa_tenant_binding(
             context, tenant_id, nwa_tenant_id, nwa_data
         )
 
