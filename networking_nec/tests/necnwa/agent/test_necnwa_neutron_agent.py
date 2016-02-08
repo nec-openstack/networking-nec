@@ -35,11 +35,9 @@ from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent \
 from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent \
     import main as agent_main
 from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent \
-    import NECNWAAgentRpcCallback
-from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent \
     import NECNWANeutronAgent
-from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent \
-    import NECNWAProxyCallback
+from networking_nec.plugins.necnwa.l2.rpc import nwa_agent_callback
+from networking_nec.plugins.necnwa.l2.rpc import nwa_proxy_callback
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_api
 
 LOG = logging.getLogger(__name__)
@@ -473,7 +471,7 @@ class TestNECNWAAgentRpcCallback(base.BaseTestCase):
         super(TestNECNWAAgentRpcCallback, self).setUp()
         self.context = MagicMock()
         self.agent = MagicMock()
-        self.callback = NECNWAAgentRpcCallback(
+        self.callback = nwa_agent_callback.NwaAgentRpcCallback(
             self.context, self.agent
         )
 
@@ -498,7 +496,8 @@ class TestNECNWAProxyCallback(base.BaseTestCase):
         super(TestNECNWAProxyCallback, self).setUp()
         self.context = MagicMock()
         self.agent = MagicMock()
-        self.callback = NECNWAProxyCallback(self.context, self.agent)
+        self.callback = nwa_proxy_callback.NwaProxyCallback(self.context,
+                                                            self.agent)
 
     def test_create_general_dev(self):
         params = {}

@@ -36,6 +36,8 @@ from oslo_service import loopingcall
 from networking_nec._i18n import _LE, _LI, _LW
 from networking_nec.plugins.necnwa.common import config
 import networking_nec.plugins.necnwa.common.constants as nwa_const
+from networking_nec.plugins.necnwa.l2.rpc import nwa_agent_callback
+from networking_nec.plugins.necnwa.l2.rpc import nwa_proxy_callback
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_api
 from networking_nec.plugins.necnwa.nwalib import client as nwa_cli
 
@@ -99,58 +101,6 @@ def check_segment_tfw(network_id, res_name, nwa_data):
                          nwa_const.NWA_DEVICE_TFW)
 
 
-class NECNWAAgentRpcCallback(object):
-    RPC_API_VERSION = '1.0'
-
-    def __init__(self, context, agent):
-        self.context = context
-        self.agent = agent
-
-    def get_nwa_rpc_servers(self, context, **kwargs):
-        LOG.debug("kwargs=%s", kwargs)
-        return {'nwa_rpc_servers':
-                [
-                    {
-                        'tenant_id': k,
-                        'topic': v['topic']
-                    } for k, v in self.agent.rpc_servers.items()
-                ]}
-
-    def create_server(self, context, **kwargs):
-        LOG.debug("kwargs=%s", kwargs)
-        tenant_id = kwargs.get('tenant_id')
-        return self.agent.create_tenant_rpc_server(tenant_id)
-
-    def delete_server(self, context, **kwargs):
-        LOG.debug("kwargs=%s", kwargs)
-        tenant_id = kwargs.get('tenant_id')
-        return self.agent.delete_tenant_rpc_server(tenant_id)
-
-
-class NECNWAProxyCallback(object):
-    RPC_API_VERSION = '1.0'
-
-    def __init__(self, context, agent):
-        self.context = context
-        self.agent = agent
-
-    def create_general_dev(self, context, **kwargs):
-        LOG.debug("Rpc callback kwargs=%s", jsonutils.dumps(
-            kwargs,
-            indent=4,
-            sort_keys=True
-        ))
-        return self.agent.create_general_dev(context, **kwargs)
-
-    def delete_general_dev(self, context, **kwargs):
-        LOG.debug("Rpc callback kwargs=%s", jsonutils.dumps(
-            kwargs,
-            indent=4,
-            sort_keys=True
-        ))
-        return self.agent.delete_general_dev(context, **kwargs)
-
-
 class NECNWANeutronAgent(object):
 
     rpc_servers = dict()
@@ -191,8 +141,10 @@ class NECNWANeutronAgent(object):
         )
 
         self.state_rpc = agent_rpc.PluginReportStateAPI(topics.REPORTS)
-        self.callback_nwa = NECNWAAgentRpcCallback(self.context, self)
-        self.callback_proxy = NECNWAProxyCallback(self.context, self)
+        self.callback_nwa = nwa_agent_callback.NwaAgentRpcCallback(
+            self.context, self)
+        self.callback_proxy = nwa_proxy_callback.NwaProxyCallback(
+            self.context, self)
 
         # lbaas
         self.lbaas_driver = None
