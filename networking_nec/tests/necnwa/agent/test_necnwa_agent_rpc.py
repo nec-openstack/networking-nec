@@ -19,8 +19,8 @@ import os
 from neutron.tests import base
 from oslo_log import log as logging
 
-from networking_nec.plugins.necnwa.agent.necnwa_agent_rpc import NECNWAAgentApi
-from networking_nec.plugins.necnwa.agent.necnwa_agent_rpc import NECNWAProxyApi
+from networking_nec.plugins.necnwa.l2.rpc.nwa_agent_api import NECNWAAgentApi
+from networking_nec.plugins.necnwa.l2.rpc.nwa_proxy_api import NECNWAProxyApi
 
 LOG = logging.getLogger(__name__)
 ROOTDIR = '/'

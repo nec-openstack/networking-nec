@@ -14,3 +14,8 @@
 
 NWA_DEVICE_GDV = "GeneralDev"
 NWA_DEVICE_TFW = "TenantFW"
+
+NWA_AGENT_TOPIC = 'nwa_agent'
+NWA_AGENT_TYPE = 'NEC NWA Agent'
+
+NWA_FIREWALL_PLUGIN = 'NECNWAFWaaS'

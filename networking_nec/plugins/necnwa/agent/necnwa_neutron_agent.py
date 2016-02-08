@@ -34,7 +34,6 @@ from oslo_serialization import jsonutils
 from oslo_service import loopingcall
 
 from networking_nec._i18n import _LE, _LI, _LW
-from networking_nec.plugins.necnwa.agent import necnwa_agent_rpc
 from networking_nec.plugins.necnwa.common import config
 import networking_nec.plugins.necnwa.common.constants as nwa_const
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_api
@@ -155,7 +154,7 @@ class NECNWAProxyCallback(object):
 class NECNWANeutronAgent(object):
 
     rpc_servers = dict()
-    topic = necnwa_agent_rpc.NWA_AGENT_TOPIC
+    topic = nwa_const.NWA_AGENT_TOPIC
 
     def __init__(self, polling_interval):
         """Constructor.
@@ -170,9 +169,9 @@ class NECNWANeutronAgent(object):
         self.agent_state = {
             'binary': 'neutron-necnwa-agent',
             'host': config.CONF.host,
-            'topic': necnwa_agent_rpc.NWA_AGENT_TOPIC,
+            'topic': nwa_const.NWA_AGENT_TOPIC,
             'configurations': {},
-            'agent_type': necnwa_agent_rpc.NWA_AGENT_TYPE,
+            'agent_type': nwa_const.NWA_AGENT_TYPE,
             'start_flag': True}
 
         self.client = nwa_cli.NwaClient()

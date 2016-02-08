@@ -26,9 +26,11 @@ from neutron.plugins.ml2 import plugin as ml2_plugin
 from oslo_log import log as logging
 
 from networking_nec._i18n import _LI, _LW
-from networking_nec.plugins.necnwa.agent import necnwa_agent_rpc
+from networking_nec.plugins.necnwa.common import constants as nwa_const
 from networking_nec.plugins.necnwa.l2 import db_api as necnwa_api
 from networking_nec.plugins.necnwa.l2.rpc import ml2_server_callback
+from networking_nec.plugins.necnwa.l2.rpc import nwa_agent_api
+from networking_nec.plugins.necnwa.l2.rpc import nwa_proxy_api
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_callback
 
 LOG = logging.getLogger(__name__)
@@ -41,8 +43,8 @@ class NECNWAL2Plugin(ml2_plugin.Ml2Plugin):
         self._nwa_agent_rpc_setup()
 
     def _nwa_agent_rpc_setup(self):
-        self.nwa_rpc = necnwa_agent_rpc.NECNWAAgentApi(
-            necnwa_agent_rpc.NWA_AGENT_TOPIC
+        self.nwa_rpc = nwa_agent_api.NECNWAAgentApi(
+            nwa_const.NWA_AGENT_TOPIC
         )
         self.nwa_proxies = dict()
 
@@ -122,7 +124,7 @@ class NECNWAL2Plugin(ml2_plugin.Ml2Plugin):
             necnwa_api.add_nwa_tenant_queue(context.session, tenant_id)
         else:
             LOG.warning(_LW('%s is not alive.') %
-                        necnwa_agent_rpc.NWA_AGENT_TYPE)
+                        nwa_const.NWA_AGENT_TYPE)
 
     def create_network(self, context, network):
         result = super(NECNWAL2Plugin,
@@ -151,8 +153,8 @@ class NECNWAL2Plugin(ml2_plugin.Ml2Plugin):
 
     def get_nwa_proxy(self, tid, context=None):
         if tid not in self.nwa_proxies.keys():
-            self.nwa_proxies[tid] = necnwa_agent_rpc.NECNWAProxyApi(
-                necnwa_agent_rpc.NWA_AGENT_TOPIC, tid
+            self.nwa_proxies[tid] = nwa_proxy_api.NECNWAProxyApi(
+                nwa_const.NWA_AGENT_TOPIC, tid
             )
             if context:
                 self._create_nwa_agent_tenant_queue(context, tid)
@@ -169,6 +171,6 @@ class NECNWAL2Plugin(ml2_plugin.Ml2Plugin):
     def _is_alive_nwa_agent(self, context):
         agents = self.get_agents(
             context,
-            filters={'agent_type': [necnwa_agent_rpc.NWA_AGENT_TYPE]}
+            filters={'agent_type': [nwa_const.NWA_AGENT_TYPE]}
         )
         return any(agent['alive'] for agent in agents)
