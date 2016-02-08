@@ -28,12 +28,14 @@ from oslo_service import loopingcall
 
 from networking_nec._i18n import _LE
 from networking_nec.plugins.necnwa.agent import proxy_l2
+from networking_nec.plugins.necnwa.agent import proxy_tenant
 from networking_nec.plugins.necnwa.agent import server_manager
 from networking_nec.plugins.necnwa.common import config
 import networking_nec.plugins.necnwa.common.constants as nwa_const
 from networking_nec.plugins.necnwa.l2.rpc import nwa_agent_callback
 from networking_nec.plugins.necnwa.l2.rpc import nwa_proxy_callback
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_api
+from networking_nec.plugins.necnwa.nwalib import client as nwa_cli
 
 
 LOG = logging.getLogger(__name__)
@@ -56,6 +58,8 @@ class NECNWANeutronAgent(object):
         self.host = socket.gethostname()
         self.agent_id = 'necnwa-q-agent.%s' % self.host
 
+        self.client = nwa_cli.NwaClient()
+
         self.agent_state = {
             'binary': 'neutron-necnwa-agent',
             'host': config.CONF.host,
@@ -65,7 +69,9 @@ class NECNWANeutronAgent(object):
             'start_flag': True}
 
         self.server_manager = server_manager.ServerManager(self.topic, self)
-        self.proxy_l2 = proxy_l2.AgentProxyL2(self)
+        self.proxy_tenant = proxy_tenant.AgentProxyTenant(self, self.client)
+        self.proxy_l2 = proxy_l2.AgentProxyL2(self, self.client,
+                                              self.proxy_tenant)
 
         self.setup_rpc()
 

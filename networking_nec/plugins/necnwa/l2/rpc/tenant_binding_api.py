@@ -13,7 +13,6 @@
 #    under the License.
 
 from neutron.common import rpc as n_rpc
-from neutron.plugins.ml2 import driver_api as api
 import oslo_messaging
 
 
@@ -25,39 +24,6 @@ class TenantBindingServerRpcApi(object):
         target = oslo_messaging.Target(topic=topic,
                                        version=self.BASE_RPC_API_VERSION)
         self.client = n_rpc.get_client(target)
-
-    def get_nwa_network_by_port_id(self, context, port_id):
-        cctxt = self.client.prepare()
-        return cctxt.call(
-            context,
-            'get_nwa_network_by_port_id',
-            port_id=port_id
-        )
-
-    def get_nwa_network_by_subnet_id(self, context, subnet_id):
-        cctxt = self.client.prepare()
-        return cctxt.call(
-            context,
-            'get_nwa_network_by_subnet_id',
-            subnet_id=subnet_id
-        )
-
-    def get_nwa_network(self, context, network_id):
-        cctxt = self.client.prepare()
-        return cctxt.call(
-            context,
-            'get_nwa_network',
-            network_id=network_id
-        )
-
-    def get_nwa_networks(self, context, tenant_id, nwa_tenant_id):
-        cctxt = self.client.prepare()
-        return cctxt.call(
-            context,
-            'get_nwa_networks',
-            tenant_id=tenant_id,
-            nwa_tenant_id=nwa_tenant_id
-        )
 
     def get_nwa_tenant_binding(self, context, tenant_id, nwa_tenant_id):
         cctxt = self.client.prepare()
@@ -106,33 +72,4 @@ class TenantBindingServerRpcApi(object):
             context,
             'update_tenant_rpc_servers',
             servers=rpc_servers
-        )
-
-    def update_port_state_with_notifier(self, context, device, agent_id,
-                                        port_id, segment, network_id):
-        physical_network = segment[api.PHYSICAL_NETWORK]
-        network_type = segment[api.NETWORK_TYPE]
-        segmentation_id = segment[api.SEGMENTATION_ID]
-
-        cctxt = self.client.prepare()
-        return cctxt.call(
-            context,
-            'update_port_state_with_notifier',
-            device=device,
-            agent_id=agent_id,
-            port_id=port_id,
-            network_id=network_id,
-            network_type=network_type,
-            segmentation_id=segmentation_id,
-            physical_network=physical_network
-        )
-
-    def release_dynamic_segment_from_agent(self, context, physical_network,
-                                           network_id):
-        cctxt = self.client.prepare()
-        return cctxt.call(
-            context,
-            'release_dynamic_segment_from_agent',
-            network_id=network_id,
-            physical_network=physical_network
         )

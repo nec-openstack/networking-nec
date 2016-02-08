@@ -30,6 +30,7 @@ from networking_nec.plugins.necnwa.common import constants as nwa_const
 from networking_nec.plugins.necnwa.l2 import db_api as necnwa_api
 from networking_nec.plugins.necnwa.l2.rpc import ml2_server_callback
 from networking_nec.plugins.necnwa.l2.rpc import nwa_agent_api
+from networking_nec.plugins.necnwa.l2.rpc import nwa_l2_server_callback
 from networking_nec.plugins.necnwa.l2.rpc import nwa_proxy_api
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_callback
 
@@ -52,8 +53,8 @@ class NECNWAL2Plugin(ml2_plugin.Ml2Plugin):
         self.endpoints = [
             ml2_server_callback.NwaML2ServerRpcCallbacks(
                 self.notifier, self.type_manager),
-            tenant_binding_callback.TenantBindingServerRpcCallback(
-                self.notifier, self.type_manager),
+            nwa_l2_server_callback.NwaL2ServerRpcCallback(),
+            tenant_binding_callback.TenantBindingServerRpcCallback(),
             securitygroups_rpc.SecurityGroupServerRpcCallback(),
             dhcp_rpc.DhcpRpcCallback(),
             agents_db.AgentExtRpcCallback(),
