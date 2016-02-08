@@ -22,21 +22,9 @@ from oslo_log import log as logging
 from oslo_serialization import jsonutils
 
 from networking_nec.plugins.necnwa.common import config
-from networking_nec.plugins.necnwa.necnwa_utils import _get_resource_group_name
-from networking_nec.plugins.necnwa.necnwa_utils import _release_dynamic_segment
-from networking_nec.plugins.necnwa.necnwa_utils \
-    import _set_general_dev_to_tenant_binding
-from networking_nec.plugins.necnwa.necnwa_utils import \
-    _set_segment_to_tenant_binding
-from networking_nec.plugins.necnwa.necnwa_utils import \
-    add_router_interface_by_port
-from networking_nec.plugins.necnwa.necnwa_utils import \
-    baremetal_resource_group_name
-from networking_nec.plugins.necnwa.necnwa_utils import get_network_info
-from networking_nec.plugins.necnwa.necnwa_utils import get_physical_network
-from networking_nec.plugins.necnwa.necnwa_utils import get_tenant_info
-from networking_nec.plugins.necnwa.necnwa_utils import is_baremetal
-from networking_nec.plugins.necnwa.necnwa_utils import update_port_status
+from networking_nec.plugins.necnwa.common import utils as nwa_com_utils
+from networking_nec.plugins.necnwa.l2 import utils as nwa_l2_utils
+from networking_nec.plugins.necnwa.l3 import utils as nwa_l3_utils
 
 LOG = logging.getLogger(__name__)
 
@@ -176,31 +164,33 @@ class TestNwa(base.BaseTestCase):
 
 class TestGetTenantInfo(TestNwa):
     def test_get_tenant_info(self):
-        tid, nid = get_tenant_info(self.context)
+        tid, nid = nwa_com_utils.get_tenant_info(self.context)
         self.assertEqual(tid, 'T1')
         self.assertEqual(nid, 'RegionOneT1')
 
 
 class TestGetNetworkInfo(TestNwa):
     def test_get_network_info(self):
-        net, nid = get_network_info(self.context)
+        net, nid = nwa_l2_utils.get_network_info(self.context)
         self.assertEqual(net, 'PublicVLAN_100')
         self.assertEqual(nid, 'Uuid-PublicVLAN_100')
 
 
 class TestGetPhysicalNetwork(TestNwa):
     def test_get_physical_network(self):
-        pnet = get_physical_network('compute:AZ1')
+        pnet = nwa_l2_utils.get_physical_network('compute:AZ1')
         self.assertEqual(pnet, 'Common/KVM/Pod1-1')
 
-        pnet = get_physical_network('compute:AZ1', 'Common/KVM/Pod1')
+        pnet = nwa_l2_utils.get_physical_network('compute:AZ1',
+                                                 'Common/KVM/Pod1')
         self.assertEqual(pnet, 'Common/KVM/Pod1-1')
 
     def test_get_physical_network_not_found(self):
-        pnet = get_physical_network('network:router_interface1')
+        pnet = nwa_l2_utils.get_physical_network('network:router_interface1')
         self.assertIsNone(pnet)
 
-        pnet = get_physical_network('compute:AZ1', 'Common/KVM/Pod2')
+        pnet = nwa_l2_utils.get_physical_network('compute:AZ1',
+                                                 'Common/KVM/Pod2')
         self.assertIsNone(pnet)
 
 
@@ -211,7 +201,7 @@ class TestUpdatePortStatus(TestNwa):
         port = {'status': None}
         ctx = MagicMock()
         ctx.session.query().filter_by().one = MagicMock(return_value=port)
-        update_port_status(ctx, port_id, status)
+        nwa_l2_utils.update_port_status(ctx, port_id, status)
         self.assertEqual(port['status'], status)
 
     def test_update_port_status_2(self):
@@ -221,7 +211,7 @@ class TestUpdatePortStatus(TestNwa):
         ctx = self.context
         ctx.network._plugin_context.session.query().filter_by().one = \
             MagicMock(return_value=port)
-        update_port_status(ctx, port_id, status)
+        nwa_l2_utils.update_port_status(ctx, port_id, status)
         self.assertEqual(port['status'], status)
 
     def test_update_port_status_3(self):
@@ -232,7 +222,7 @@ class TestUpdatePortStatus(TestNwa):
             MagicMock(side_effect=exc.NoResultFound)
         self.assertRaises(
             n_exc.PortNotFound,
-            update_port_status, ctx, port_id, status
+            nwa_l2_utils.update_port_status, ctx, port_id, status
         )
 
 
@@ -247,7 +237,7 @@ class TestIsBaremetal(base.BaseTestCase):
 
     def check_is_baremetal(self, param):
         config.CONF.NWA.ironic_az_prefix = param['ironic_az_prefix']
-        return is_baremetal(param['device_owner'])
+        return nwa_l2_utils.is_baremetal(param['device_owner'])
 
     def test_is_baremetal(self):
         test_params = [
@@ -299,7 +289,8 @@ class TestBaremetalResourceGroupName(base.BaseTestCase):
         config.CONF.NWA.port_map = param['portmap']
         rc = None
         try:
-            rc = baremetal_resource_group_name(param['mac_address'])
+            rc = nwa_l2_utils.baremetal_resource_group_name(
+                param['mac_address'])
         except KeyError:
             rc = 'KeyError'
         finally:
@@ -343,19 +334,19 @@ class TestBaremetalResourceGroupName(base.BaseTestCase):
 class test__getResourceGroupName(TestNwa):
     def test__get_resource_group_name(self):
         self.context.current['device_owner'] = 'network:dhcp'
-        rc = _get_resource_group_name(self.context)
+        rc = nwa_l2_utils._get_resource_group_name(self.context)
         self.assertEqual(rc, 'Common/App/Pod3')
 
         self.context.current['device_owner'] = 'network:router_interface'
-        rc = _get_resource_group_name(self.context)
+        rc = nwa_l2_utils._get_resource_group_name(self.context)
         self.assertEqual(rc, 'Common/App/Pod4')
 
         self.context.current['device_owner'] = 'network:router_gateway'
-        rc = _get_resource_group_name(self.context)
+        rc = nwa_l2_utils._get_resource_group_name(self.context)
         self.assertEqual(rc, 'Common/App/Pod4')
 
         self.context.current['device_owner'] = 'compute:AZ1'
-        rc = _get_resource_group_name(self.context)
+        rc = nwa_l2_utils._get_resource_group_name(self.context)
         self.assertIsNone(rc)
 
 
@@ -364,7 +355,8 @@ class test__releaseDynamicSegment(TestNwa):
     @patch('neutron.plugins.ml2.db.get_dynamic_segment')
     def test__release_dynamic_segment(self, gds, dns):
         gds.return_value = self.network_segments[0]
-        rc = _release_dynamic_segment(self.context, None, None, None, 1)
+        rc = nwa_l2_utils._release_dynamic_segment(self.context,
+                                                   None, None, None, 1)
         self.assertTrue(rc)
         self.assertEqual(gds.call_count, 1)
         self.assertEqual(dns.call_count, 1)
@@ -373,7 +365,8 @@ class test__releaseDynamicSegment(TestNwa):
     @patch('neutron.plugins.ml2.db.get_dynamic_segment')
     def test__release_dynamic_segment_not_found(self, gds, dns):
         gds.return_value = None
-        rc = _release_dynamic_segment(self.context, None, None, None, 1)
+        rc = nwa_l2_utils._release_dynamic_segment(self.context,
+                                                   None, None, None, 1)
         self.assertFalse(rc)
         self.assertEqual(gds.call_count, 1)
         self.assertEqual(dns.call_count, 0)
@@ -382,7 +375,8 @@ class test__releaseDynamicSegment(TestNwa):
     @patch('neutron.plugins.ml2.db.get_dynamic_segment')
     def test__release_dynamic_segment_exception(self, gds, dns):
         gds.side_effect = Exception
-        rc = _release_dynamic_segment(self.context, None, None, None, 1)
+        rc = nwa_l2_utils._release_dynamic_segment(self.context,
+                                                   None, None, None, 1)
         self.assertFalse(rc)
 
 
@@ -393,7 +387,7 @@ class test__setSegmentToTenantBinding(TestNwa):
         self.rcode.value_json = {}
         gntb.return_value = self.rcode
         sntb.return_value = True
-        _set_segment_to_tenant_binding(self.context, self.jbody)
+        nwa_l2_utils._set_segment_to_tenant_binding(self.context, self.jbody)
         self.assertEqual(gntb.call_count, 1)
         self.assertEqual(sntb.call_count, 1)
 
@@ -403,7 +397,7 @@ class test__setSegmentToTenantBinding(TestNwa):
         self.rcode.value_json = {}
         gntb.return_value = self.rcode
         sntb.return_value = False
-        _set_segment_to_tenant_binding(self.context, self.jbody)
+        nwa_l2_utils._set_segment_to_tenant_binding(self.context, self.jbody)
         self.assertEqual(gntb.call_count, 1)
         self.assertEqual(sntb.call_count, 1)
 
@@ -414,18 +408,18 @@ class test__setGeneralDevToTenantBinding(TestNwa):
     def test__set_general_dev_to_tenant_binding(self, gntb, sntb):
         gntb.return_value = self.rcode
         sntb.return_value = True
-        _set_general_dev_to_tenant_binding(self.context)
+        nwa_l2_utils._set_general_dev_to_tenant_binding(self.context)
         self.assertEqual(gntb.call_count, 1)
         self.assertEqual(sntb.call_count, 1)
 
         sntb.return_value = False
-        _set_general_dev_to_tenant_binding(self.context)
+        nwa_l2_utils._set_general_dev_to_tenant_binding(self.context)
         self.assertEqual(gntb.call_count, 2)
         self.assertEqual(sntb.call_count, 2)
 
         sntb.return_value = None
         sntb.side_effect = Exception
-        _set_general_dev_to_tenant_binding(self.context)
+        nwa_l2_utils._set_general_dev_to_tenant_binding(self.context)
         self.assertEqual(gntb.call_count, 3)
         self.assertEqual(sntb.call_count, 3)
 
@@ -592,14 +586,14 @@ class TestAddRouterInterfaceByPort(TestNwa):
         proxy.create_tenant_fw = create_tenant_fw
         plugin._core_plugin.get_nwa_proxy = MagicMock(return_value=proxy)
 
-        add_router_interface_by_port(
+        nwa_l3_utils.add_router_interface_by_port(
             plugin, context, router_id, interface_info
         )
         self.assertEqual(create_tenant_fw.call_count, 1)
 
         create_tenant_fw.reset_mock()
         plugin._core_plugin.get_nwa_proxy.side_effect = Exception
-        add_router_interface_by_port(
+        nwa_l3_utils.add_router_interface_by_port(
             plugin, context, router_id, interface_info
         )
         self.assertEqual(create_tenant_fw.call_count, 0)
