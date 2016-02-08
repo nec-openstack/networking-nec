@@ -28,21 +28,15 @@ from oslo_log import log as logging
 import networking_nec
 NECNWA_INI = (networking_nec.__path__[0] +
               '/../etc/neutron/plugins/nec/necnwa.ini')
-import networking_nec.plugins.necnwa.agent.necnwa_neutron_agent as \
-    necnwa_neutron_agent
-from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent \
-    import check_segment
-from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent \
-    import main as agent_main
-from networking_nec.plugins.necnwa.agent.necnwa_neutron_agent \
-    import NECNWANeutronAgent
+from networking_nec.plugins.necnwa.agent import necnwa_neutron_agent
+from networking_nec.plugins.necnwa.agent import proxy_l2
 from networking_nec.plugins.necnwa.l2.rpc import nwa_agent_callback
 from networking_nec.plugins.necnwa.l2.rpc import nwa_proxy_callback
 from networking_nec.plugins.necnwa.l2.rpc import tenant_binding_api
 
 LOG = logging.getLogger(__name__)
 
-necnwa_neutron_agent.WAIT_AGENT_NOTIFIER = 0
+proxy_l2.WAIT_AGENT_NOTIFIER = 0
 
 """""
 test params
@@ -520,7 +514,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self._patch_nwa_client()
         self._config_parse()
         self.context = MagicMock()
-        self.agent = NECNWANeutronAgent(10)
+        self.agent = necnwa_neutron_agent.NECNWANeutronAgent(10)
         self.agent.nwa_l2_rpc = \
             tenant_binding_api.TenantBindingServerRpcApi("dummy")
         rpc.init(cfg.ConfigOpts())
@@ -562,7 +556,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
     @patch('oslo_messaging.server.MessageHandlingServer')
     def test_create_tenant_rpc_server(self, f1):
         tenant_id = '844eb55f21e84a289e9c22098d387e5d'
-        rd = self.agent.create_tenant_rpc_server(tenant_id)
+        rd = self.agent.server_manager.create_tenant_rpc_server(tenant_id)
         self.assertIsInstance(rd, dict)
         self.assertEqual(rd['result'], 'SUCCESS')
         self.assertEqual(rd['tenant_id'], tenant_id)
@@ -574,32 +568,32 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi')  # noqa
     def test_create_tenant_rpc_server_fail(self, f1, f2, f3, f4, f5):
         tenant_id = '844eb55f21e84a289e9c22098d387e5d'
-        self.agent.rpc_servers[tenant_id] = {
+        self.agent.server_manager.rpc_servers[tenant_id] = {
             'server': None,
             'topic': "%s-%s" % (self.agent.topic, tenant_id)
         }
-        rd = self.agent.create_tenant_rpc_server(tenant_id)
+        rd = self.agent.server_manager.create_tenant_rpc_server(tenant_id)
         self.assertIsInstance(rd, dict)
         self.assertEqual(rd['result'], 'FAILED')
 
     @patch('oslo_messaging.rpc.server.get_rpc_server')
     def test_delete_tenant_rpc_server(self, f1):
         tenant_id = '844eb55f21e84a289e9c22098d387e5d'
-        self.agent.rpc_servers = {
+        self.agent.server_manager.rpc_servers = {
             tenant_id: {
                 'server': f1,
                 'topic': "%s-%s" % (self.agent.topic, tenant_id)
             }
         }
-        rd = self.agent.delete_tenant_rpc_server(tenant_id)
+        rd = self.agent.server_manager.delete_tenant_rpc_server(tenant_id)
         self.assertIsInstance(rd, dict)
         self.assertEqual(rd['result'], 'SUCCESS')
         self.assertEqual(rd['tenant_id'], tenant_id)
 
     def test_delete_tenant_rpc_server_fail(self):
         tenant_id = '844eb55f21e84a289e9c22098d387e5d'
-        self.agent.rpc_servers = dict()
-        rd = self.agent.delete_tenant_rpc_server(tenant_id)
+        self.agent.server_manager.rpc_servers = dict()
+        rd = self.agent.server_manager.delete_tenant_rpc_server(tenant_id)
         self.assertIsInstance(rd, dict)
         self.assertEqual(rd['result'], 'FAILED')
 
@@ -622,7 +616,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
         self.nwacli.create_tenant.return_value = 200, {}
 
-        rcode, body = self.agent._create_tenant(
+        rcode, body = self.agent.proxy_l2._create_tenant(
             self.context,
             nwa_tenant_id=nwa_tenant_id
         )
@@ -633,7 +627,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
     def test__create_tenant_failed(self):
         nwa_tenant_id = 'DC1_844eb55f21e84a289e9c22098d387e5d'
         self.nwacli.create_tenant.return_value = 400, {}
-        rcode, body = self.agent._create_tenant(
+        rcode, body = self.agent.proxy_l2._create_tenant(
             self.context,
             nwa_tenant_id=nwa_tenant_id
         )
@@ -642,7 +636,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     def test__delete_tenant(self):
         nwa_tenant_id = 'DC1_844eb55f21e84a289e9c22098d387e5d'
-        result, nwa_data = self.agent._delete_tenant(
+        result, nwa_data = self.agent.proxy_l2._delete_tenant(
             self.context,
             nwa_tenant_id=nwa_tenant_id
         )
@@ -653,7 +647,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
     def test__delete_tenant_failed(self):
         nwa_tenant_id = 'DC1_844eb55f21e84a289e9c22098d387e5d'
         self.nwacli.delete_tenant.return_value = 500, dict()
-        result, nwa_data = self.agent._delete_tenant(
+        result, nwa_data = self.agent.proxy_l2._delete_tenant(
             self.context,
             nwa_tenant_id=nwa_tenant_id
         )
@@ -670,7 +664,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
             'resource_group_name_nw': resource_group_name,
         }
         self.nwacli.create_tenant_nw.return_value = 500, dict()
-        result, nwa_data2 = self.agent._create_tenant_nw(
+        result, nwa_data2 = self.agent.proxy_l2._create_tenant_nw(
             self.context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -691,7 +685,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         ret_vln = deepcopy(result_vln)
         ret_vln['resultdata']['VlanID'] = '300'
         self.nwacli.create_vlan.return_value = (200, ret_vln)
-        result, nwa_data = self.agent._create_vlan(
+        result, nwa_data = self.agent.proxy_l2._create_vlan(
             self.context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -707,7 +701,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         nwa_data = {'NW_546a8551-5c2b-4050-a769-cc3c962fc5cf': 'net100'}
         nwa_info = deepcopy(nwa_info_add_intf)
         self.nwacli.create_vlan.return_value = 500, dict()
-        result, nwa_data = self.agent._create_vlan(
+        result, nwa_data = self.agent.proxy_l2._create_vlan(
             self.context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -749,7 +743,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
         nwa_info = deepcopy(nwa_info_add_intf)
         self.nwacli.create_vlan.return_value = (200, deepcopy(result_dvl))
-        result, nwa_data = self.agent._delete_vlan(
+        result, nwa_data = self.agent.proxy_l2._delete_vlan(
             self.context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -759,7 +753,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_create_general_dev_succeed1(self, utb, stb, gtb):
         global result_tnw, result_vln, result_cgd
         context = MagicMock()
@@ -773,7 +767,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.create_vlan.     return_value = (200, deepcopy(result_vln))
         gtb.return_value = dict()
 
-        self.agent.create_general_dev(
+        self.agent.proxy_l2.create_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -782,7 +776,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_create_general_dev_succeed2(self, utb, stb, gtb):
         global result_tnw, result_vln, result_cgd
         global nwa_data_one_gdev
@@ -797,7 +791,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.create_vlan.     return_value = (200, deepcopy(result_vln))
         gtb.return_value = deepcopy(nwa_data_one_gdev)
 
-        self.agent.create_general_dev(
+        self.agent.proxy_l2.create_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -806,7 +800,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_create_general_dev_fail1(self, utb, stb, gtb):
         global result_tnw, result_vln, result_cgd
         context = MagicMock()
@@ -820,7 +814,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.create_vlan.     return_value = (200, deepcopy(result_vln))
         gtb.return_value = dict()
 
-        self.agent.create_general_dev(
+        self.agent.proxy_l2.create_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -829,7 +823,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_create_general_dev_fail2(self, utb, stb, gtb):
         global result_tnw, result_vln, result_cgd
         context = MagicMock()
@@ -843,7 +837,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.create_vlan.     return_value = (500, deepcopy(result_vln))
         gtb.return_value = dict()
 
-        self.agent.create_general_dev(
+        self.agent.proxy_l2.create_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -852,7 +846,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_create_general_dev_fail3(self, utb, stb, gtb):
         global result_tnw, result_vln, result_cgd
         context = MagicMock()
@@ -866,7 +860,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.create_vlan.     return_value = (200, deepcopy(result_vln))
         gtb.return_value = dict()
 
-        self.agent.create_general_dev(
+        self.agent.proxy_l2.create_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -875,7 +869,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_create_general_dev_fail4(self, utb, stb, gtb):
         global result_tnw, result_vln, result_cgd
         context = MagicMock()
@@ -889,7 +883,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.create_vlan.     return_value = (200, deepcopy(result_vln))
         gtb.return_value = dict()
 
-        self.agent.create_general_dev(
+        self.agent.proxy_l2.create_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -898,7 +892,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_succeed1(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global pnwa_info_delete_gdv
@@ -914,7 +908,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = nwa_data
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -923,7 +917,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_succeed2(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv
@@ -938,7 +932,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = deepcopy(nwa_data_two_gdev)
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -947,7 +941,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_succeed3(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv
@@ -962,7 +956,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = deepcopy(nwa_data_two_port_gdev)
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -971,7 +965,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_fail1(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv
@@ -986,7 +980,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = deepcopy(nwa_data_one_gdev)
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -995,7 +989,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_fail2(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv
@@ -1011,7 +1005,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = nwa_data
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -1020,7 +1014,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_fail3(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv
@@ -1035,7 +1029,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = deepcopy(nwa_data_one_gdev)
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -1044,7 +1038,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_fail4(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv
@@ -1059,7 +1053,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = deepcopy(nwa_data_one_gdev)
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -1068,7 +1062,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_fail5(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv
@@ -1083,7 +1077,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (500, deepcopy(result_dvl))
         gtb.return_value = deepcopy(nwa_data_one_gdev)
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -1092,7 +1086,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_fail6(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv, nwa_data_gdev_fail6
@@ -1107,7 +1101,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = deepcopy(nwa_data_gdev_fail6)
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -1116,7 +1110,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_delete_general_dev_fail7(self, utb, stb, gtb):
         global nwa_data_one_gdev, result_dgd, result_dvl, result_dnw
         global nwa_info_delete_gdv, nwa_data_gdev_fail6
@@ -1131,7 +1125,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         self.nwacli.delete_vlan.return_value = (200, deepcopy(result_dvl))
         gtb.return_value = dict()
 
-        self.agent.delete_general_dev(
+        self.agent.proxy_l2.delete_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -1145,7 +1139,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         args = MagicMock()
         kwargs = MagicMock()
 
-        self.agent._dummy_ok(context, rcode, jbody, args, kwargs)
+        self.agent.proxy_l2._dummy_ok(context, rcode, jbody, args, kwargs)
 
     def test__dummy_ng(self):
         context = MagicMock()
@@ -1154,14 +1148,14 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         args = MagicMock()
         kwargs = MagicMock()
 
-        self.agent._dummy_ng(context, rcode, jbody, args, kwargs)
+        self.agent.proxy_l2._dummy_ng(context, rcode, jbody, args, kwargs)
 
     def test__update_tenant_binding_true(self):
         context = MagicMock()
         tenant_id = '844eb55f21e84a289e9c22098d387e5d'
         nwa_tenant_id = 'DC1_844eb55f21e84a289e9c22098d387e5d',
         nwa_data = dict()
-        self.agent._update_tenant_binding(
+        self.agent.proxy_l2._update_tenant_binding(
             context,
             tenant_id,
             nwa_tenant_id,
@@ -1174,7 +1168,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
         tenant_id = '844eb55f21e84a289e9c22098d387e5d'
         nwa_tenant_id = 'DC1_844eb55f21e84a289e9c22098d387e5d',
         nwa_data = dict()
-        self.agent._update_tenant_binding(
+        self.agent.proxy_l2._update_tenant_binding(
             context,
             tenant_id,
             nwa_tenant_id,
@@ -1187,7 +1181,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
 
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     def test_create_general_dev_ex1(self, utb, stb, gtb):
         global result_tnw, result_vln, result_cgd
         context = MagicMock()
@@ -1249,7 +1243,7 @@ class TestNECNWANeutronAgentAsNwaClient(base.BaseTestCase):
             "VLAN_0ed65870-9acb-48ce-8c0b-e803d527a9d2_OpenStack/DC1/APP_VlanID": "53"  # noqa
         }
 
-        self.agent.create_general_dev(
+        self.agent.proxy_l2.create_general_dev(
             context,
             tenant_id=tenant_id,
             nwa_tenant_id=nwa_tenant_id,
@@ -1283,14 +1277,14 @@ def test_check_segment():
         "VLAN_a94fd0fc-2282-4092-9485-b0f438b0f6c4_OpenStack/DC1/APP_FW_TFW843bc108-2f17-4be4-b9cb-44e00abe78d1": "connected",  # noqa
         "VLAN_a94fd0fc-2282-4092-9485-b0f438b0f6c4_OpenStack/DC1/APP_VlanID": "37"  # noqa
     }
-    check_segment(network_id, nwa_data)
+    proxy_l2.check_segment(network_id, nwa_data)
 
 
 @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent')  # noqa
 @patch('neutron.common.config')
 @patch('sys.argv')
 def test_main(f1, f2, f3):
-    agent_main()
+    necnwa_neutron_agent.main()
 
 
 class TestNECNWANeutronAgentRpc(base.BaseTestCase):
@@ -1304,7 +1298,7 @@ class TestNECNWANeutronAgentRpc(base.BaseTestCase):
         super(TestNECNWANeutronAgentRpc, self).setUp()
         self._patch_nwa_client()
         self._config_parse()
-        self.agent = NECNWANeutronAgent(10)
+        self.agent = necnwa_neutron_agent.NECNWANeutronAgent(10)
         self.agent.nwa_l2_rpc = \
             tenant_binding_api.TenantBindingServerRpcApi("dummy")
 
@@ -1332,7 +1326,7 @@ class TestNECNWANeutronAgentRpc(base.BaseTestCase):
     # ### GeneralDev: None
     # ### add Openstack/DC/HA1
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
     def test_create_general_dev_succeed1(self, stb, utb, gtb):
         global result_tnw, result_vln, result_tfw, nwa_info_add_intf
@@ -1368,16 +1362,17 @@ class TestNECNWANeutronAgentRpc(base.BaseTestCase):
             },
             "tenant_id": "5d9c51b1d6a34133bb735d4988b309c2"
         }
-        rc = self.agent.create_general_dev(context,
-                                           tenant_id=tenant_id,
-                                           nwa_tenant_id=nwa_tenant_id,
-                                           nwa_info=nwa_info)
+        rc = self.agent.proxy_l2.create_general_dev(
+            context,
+            tenant_id=tenant_id,
+            nwa_tenant_id=nwa_tenant_id,
+            nwa_info=nwa_info)
         self.assertTrue(rc)
 
     # ### GeneralDev: Openstack/DC/HA1
     # ### add Openstack/DC/HA1
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
     def test_create_general_dev_succeed21(self, stb, utb, gtb):
 
@@ -1439,16 +1434,17 @@ class TestNECNWANeutronAgentRpc(base.BaseTestCase):
             },
             "tenant_id": "5d9c51b1d6a34133bb735d4988b309c2"
         }
-        rc = self.agent.create_general_dev(context,
-                                           tenant_id=tenant_id,
-                                           nwa_tenant_id=nwa_tenant_id,
-                                           nwa_info=nwa_info)
+        rc = self.agent.proxy_l2.create_general_dev(
+            context,
+            tenant_id=tenant_id,
+            nwa_tenant_id=nwa_tenant_id,
+            nwa_info=nwa_info)
         self.assertTrue(rc)
 
     # ### GeneralDev: Openstack/DC/HA1
     # ### add Openstack/DC/HA2
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
     def test_create_general_dev_succeed3(self, stb, utb, gtb):
 
@@ -1511,16 +1507,17 @@ class TestNECNWANeutronAgentRpc(base.BaseTestCase):
             "tenant_id": "5d9c51b1d6a34133bb735d4988b309c2"
         }
 
-        rc = self.agent.create_general_dev(context,
-                                           tenant_id=tenant_id,
-                                           nwa_tenant_id=nwa_tenant_id,
-                                           nwa_info=nwa_info)
+        rc = self.agent.proxy_l2.create_general_dev(
+            context,
+            tenant_id=tenant_id,
+            nwa_tenant_id=nwa_tenant_id,
+            nwa_info=nwa_info)
         self.assertTrue(rc)
 
     # ### GeneralDev: Openstack/DC/HA1 x1
     # ### del Openstack/DC/HA1
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
     def test_delete_general_dev_succeed1(self, stb, utb, gtb):
 
@@ -1583,16 +1580,17 @@ class TestNECNWANeutronAgentRpc(base.BaseTestCase):
             "tenant_id": "5d9c51b1d6a34133bb735d4988b309c2"
         }
 
-        rc = self.agent.delete_general_dev(context,
-                                           tenant_id=tenant_id,
-                                           nwa_tenant_id=nwa_tenant_id,
-                                           nwa_info=nwa_info)
+        rc = self.agent.proxy_l2.delete_general_dev(
+            context,
+            tenant_id=tenant_id,
+            nwa_tenant_id=nwa_tenant_id,
+            nwa_info=nwa_info)
         self.assertTrue(rc)
 
     # ### GeneralDev: Openstack/DC/HA1 x2
     # ### del Openstack/DC/HA1
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
     def test_delete_general_dev_succeed2(self, stb, utb, gtb):
 
@@ -1661,16 +1659,17 @@ class TestNECNWANeutronAgentRpc(base.BaseTestCase):
             "tenant_id": "5d9c51b1d6a34133bb735d4988b309c2"
         }
 
-        rc = self.agent.delete_general_dev(context,
-                                           tenant_id=tenant_id,
-                                           nwa_tenant_id=nwa_tenant_id,
-                                           nwa_info=nwa_info)
+        rc = self.agent.proxy_l2.delete_general_dev(
+            context,
+            tenant_id=tenant_id,
+            nwa_tenant_id=nwa_tenant_id,
+            nwa_info=nwa_info)
         self.assertTrue(rc)
 
     # ### GeneralDev: Openstack/DC/HA1 x1, Openstack/DC/HA2 x1
     # ### del Openstack/DC/HA1
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.get_nwa_tenant_binding')  # noqa
-    @patch('networking_nec.plugins.necnwa.agent.necnwa_neutron_agent.NECNWANeutronAgent._update_tenant_binding')  # noqa
+    @patch('networking_nec.plugins.necnwa.agent.proxy_l2.AgentProxyL2._update_tenant_binding')  # noqa
     @patch('networking_nec.plugins.necnwa.l2.rpc.tenant_binding_api.TenantBindingServerRpcApi.set_nwa_tenant_binding')  # noqa
     def test_delete_general_dev_succeed3(self, stb, utb, gtb):
 
@@ -1740,8 +1739,9 @@ class TestNECNWANeutronAgentRpc(base.BaseTestCase):
             },
             "tenant_id": "5d9c51b1d6a34133bb735d4988b309c2"
         }
-        rc = self.agent.delete_general_dev(context,
-                                           tenant_id=tenant_id,
-                                           nwa_tenant_id=nwa_tenant_id,
-                                           nwa_info=nwa_info)
+        rc = self.agent.proxy_l2.delete_general_dev(
+            context,
+            tenant_id=tenant_id,
+            nwa_tenant_id=nwa_tenant_id,
+            nwa_info=nwa_info)
         self.assertTrue(rc)
