@@ -92,14 +92,9 @@ class NECPluginV2RPCCallbacks(object):
             if port:
                 ndb.add_portinfo(session, id, datapath_id, p['port_no'],
                                  mac=p.get('mac', ''))
-                # NOTE: Make sure that packet filters on this port exist while
-                # the port is active to avoid unexpected packet transfer.
                 if portinfo:
                     self.plugin.l2mgr.deactivate_port(rpc_context, port,
                                                       raise_exc=False)
-                    self.plugin.deactivate_packet_filters_by_port(
-                        rpc_context, id, raise_exc=False)
-                self.plugin.activate_packet_filters_by_port(rpc_context, id)
                 self.plugin.l2mgr.activate_port_if_ready(rpc_context, port)
         for id in kwargs.get('port_removed', []):
             portinfo = ndb.get_portinfo(session, id)
@@ -121,8 +116,6 @@ class NECPluginV2RPCCallbacks(object):
             if port:
                 self.plugin.l2mgr.deactivate_port(rpc_context, port,
                                                   raise_exc=False)
-                self.plugin.deactivate_packet_filters_by_port(
-                    rpc_context, id, raise_exc=False)
 
     def _get_port(self, context, port_id):
         try:

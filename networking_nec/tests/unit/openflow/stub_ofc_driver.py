@@ -12,18 +12,13 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import netaddr
 from oslo_log import helpers as log_helpers
 from oslo_log import log as logging
-from oslo_utils import uuidutils
 
-from networking_nec.plugins.openflow import exceptions as nexc
 from networking_nec.plugins.openflow import ofc_driver_base
 
 
 LOG = logging.getLogger(__name__)
-
-MAX_NUM_OPENFLOW_ROUTER = 2
 
 
 class StubOFCDriver(ofc_driver_base.OFCDriverBase):
@@ -45,10 +40,6 @@ class StubOFCDriver(ofc_driver_base.OFCDriverBase):
         self.ofc_tenant_dict = {}
         self.ofc_network_dict = {}
         self.ofc_port_dict = {}
-        self.ofc_filter_dict = {}
-        self.ofc_router_dict = {}
-        self.ofc_router_inf_dict = {}
-        self.ofc_router_route_dict = {}
 
     def enable_autocheck(self):
         self.autocheck = True
@@ -113,7 +104,7 @@ class StubOFCDriver(ofc_driver_base.OFCDriverBase):
         LOG.debug('delete_network: SUCCEED')
 
     @log_helpers.log_method_call
-    def create_port(self, ofc_network_id, info, port_id=None, filters=None):
+    def create_port(self, ofc_network_id, info, port_id=None):
         ofc_id = "ofc-" + port_id[:-4]
         if self.autocheck:
             if ofc_network_id not in self.ofc_network_dict:
@@ -124,8 +115,6 @@ class StubOFCDriver(ofc_driver_base.OFCDriverBase):
                                 % ofc_id)
         self.ofc_port_dict[ofc_id] = {'network_id': ofc_network_id,
                                       'port_id': port_id}
-        if filters:
-            self.ofc_port_dict[ofc_id]['filters'] = filters
         return ofc_id
 
     @log_helpers.log_method_call
@@ -138,16 +127,6 @@ class StubOFCDriver(ofc_driver_base.OFCDriverBase):
                                 % ofc_port_id)
         LOG.debug('delete_port: SUCCEED')
 
-    @classmethod
-    def filter_supported(cls):
-        return True
-
-    def create_filter(self, context, filter_dict, filter_id=None):
-        return "ofc-" + filter_id[:-4]
-
-    def delete_filter(self, ofc_filter_id):
-        pass
-
     def convert_ofc_tenant_id(self, context, ofc_tenant_id):
         return ofc_tenant_id
 
@@ -156,134 +135,3 @@ class StubOFCDriver(ofc_driver_base.OFCDriverBase):
 
     def convert_ofc_port_id(self, context, ofc_port_id, tenant_id, network_id):
         return ofc_port_id
-
-    def convert_ofc_filter_id(self, context, ofc_filter_id):
-        return ofc_filter_id
-
-    router_supported = True
-    router_nat_supported = True
-
-    @log_helpers.log_method_call
-    def create_router(self, ofc_tenant_id, router_id, description):
-        ofc_id = "ofc-" + router_id[:-4]
-        if self.autocheck:
-            if ofc_tenant_id not in self.ofc_tenant_dict:
-                raise Exception(_('(create_router) OFC tenant %s not found')
-                                % ofc_tenant_id)
-            if ofc_id in self.ofc_router_dict:
-                raise Exception(_('(create_router) OFC router %s '
-                                  'already exists') % ofc_id)
-        if len(self.ofc_router_dict) >= MAX_NUM_OPENFLOW_ROUTER:
-            params = {'reason': _("Operation on OFC is failed"),
-                      'status': 409}
-            raise nexc.OFCException(**params)
-        self.ofc_router_dict[ofc_id] = {'tenant_id': ofc_tenant_id,
-                                        'router_id': router_id,
-                                        'description': description}
-        return ofc_id
-
-    @log_helpers.log_method_call
-    def delete_router(self, ofc_router_id):
-        if ofc_router_id in self.ofc_router_dict:
-            del self.ofc_router_dict[ofc_router_id]
-        else:
-            if self.autocheck:
-                raise Exception(_('(delete_router) OFC router %s not found')
-                                % ofc_router_id)
-        LOG.debug('delete_router: SUCCEED')
-
-    @log_helpers.log_method_call
-    def add_router_interface(self, ofc_router_id, ofc_net_id,
-                             ip_address=None, mac_address=None):
-        if_id = "ofc-" + uuidutils.generate_uuid()[:-4]
-        # IP address should have a format of a.b.c.d/N
-        if ip_address != str(netaddr.IPNetwork(ip_address)):
-            raise Exception(_('(add_router_interface) '
-                            'ip_address %s is not a valid format (a.b.c.d/N).')
-                            % ip_address)
-        if self.autocheck:
-            if ofc_router_id not in self.ofc_router_dict:
-                raise Exception(_('(add_router_interface) '
-                                  'OFC router %s not found') % ofc_router_id)
-            if ofc_net_id not in self.ofc_network_dict:
-                raise Exception(_('(add_router_interface) '
-                                  'OFC network %s not found') % ofc_net_id)
-            # Check duplicate destination
-        self.ofc_router_inf_dict[if_id] = {'router_id': ofc_router_id,
-                                           'network_id': ofc_net_id,
-                                           'ip_address': ip_address,
-                                           'mac_address': mac_address}
-        LOG.debug('add_router_interface: SUCCEED (if_id=%s)', if_id)
-        return if_id
-
-    @log_helpers.log_method_call
-    def update_router_interface(self, ofc_router_inf_id,
-                                ip_address=None, mac_address=None):
-        if ofc_router_inf_id not in self.ofc_router_inf_dict:
-            if self.autocheck:
-                raise Exception(_('(delete_router_interface) '
-                                  'OFC router interface %s not found')
-                                % ofc_router_inf_id)
-            self.ofc_router_inf_dict[ofc_router_inf_id] = {}
-        inf = self.ofc_router_inf_dict[ofc_router_inf_id]
-        if ip_address:
-            inf.update({'ip_address': ip_address})
-        if mac_address:
-            inf.update({'mac_address': mac_address})
-        LOG.debug('update_router_route: SUCCEED')
-
-    @log_helpers.log_method_call
-    def delete_router_interface(self, ofc_router_inf_id):
-        if ofc_router_inf_id in self.ofc_router_inf_dict:
-            del self.ofc_router_inf_dict[ofc_router_inf_id]
-        else:
-            if self.autocheck:
-                raise Exception(_('(delete_router_interface) '
-                                  'OFC router interface %s not found')
-                                % ofc_router_inf_id)
-        LOG.debug('delete_router_interface: SUCCEED')
-
-    @log_helpers.log_method_call
-    def add_router_route(self, ofc_router_id, destination, nexthop):
-        route_id = "ofc-" + uuidutils.generate_uuid()[:-4]
-        # IP address format check
-        netaddr.IPNetwork(destination)
-        netaddr.IPAddress(nexthop)
-        if self.autocheck:
-            if ofc_router_id not in self.ofc_router_dict:
-                raise Exception(_('(add_router_route) OFC router %s not found')
-                                % ofc_router_id)
-            # Check duplicate destination
-            if destination in [route['destination'] for route in
-                               self.ofc_router_route_dict.values()]:
-                raise Exception(_('(add_router_route) '
-                                'route to "%s" already exists') % destination)
-        self.ofc_router_route_dict[route_id] = {'router_id': ofc_router_id,
-                                                'destination': destination,
-                                                'nexthop': nexthop}
-        LOG.debug('add_router_route: SUCCEED (route_id=%s)', route_id)
-        return route_id
-
-    @log_helpers.log_method_call
-    def delete_router_route(self, ofc_router_route_id):
-        if ofc_router_route_id in self.ofc_router_route_dict:
-            del self.ofc_router_route_dict[ofc_router_route_id]
-        else:
-            if self.autocheck:
-                raise Exception(_('(delete_router_route) OFC router route %s '
-                                  'not found') % ofc_router_route_id)
-        LOG.debug('delete_router_route: SUCCEED')
-
-    @log_helpers.log_method_call
-    def list_router_routes(self, ofc_router_id):
-        if self.autocheck:
-            if ofc_router_id not in self.ofc_router_dict:
-                raise Exception(_('(delete_router) OFC router %s not found')
-                                % ofc_router_id)
-        routes = [{'id': k,
-                   'destination': v['destination'],
-                   'nexthop': v['nexthop']}
-                  for k, v in self.ofc_router_route_dict.items()
-                  if v['router_id'] == ofc_router_id]
-        LOG.debug('list_router_routes: routes=%s', routes)
-        return routes

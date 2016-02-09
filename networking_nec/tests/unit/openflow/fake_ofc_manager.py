@@ -32,9 +32,6 @@ def patch_ofc_manager():
     m.create_ofc_port.side_effect = f.create_ofc_port
     m.delete_ofc_port.side_effect = f.delete_ofc_port
     m.exists_ofc_port.side_effect = f.exists_ofc_port
-    m.create_ofc_packet_filter.side_effect = f.create_ofc_pf
-    m.delete_ofc_packet_filter.side_effect = f.delete_ofc_pf
-    m.exists_ofc_packet_filter.side_effect = f.exists_ofc_pf
     m.set_raise_exc = f.set_raise_exc
 
     return m
@@ -92,15 +89,3 @@ class FakeOFCManager(object):
     def delete_ofc_port(self, context, port_id, port):
         self._raise_exc('delete_ofc_port')
         del self.ofc_ports[port_id]
-
-    def create_ofc_pf(self, context, pf_id, pf_dict):
-        self._raise_exc('create_ofc_packet_filter')
-        self.ofc_pfs.update({pf_id: True})
-
-    def exists_ofc_pf(self, context, pf_id):
-        self._raise_exc('exists_ofc_packet_filter')
-        return self.ofc_pfs.get(pf_id, False)
-
-    def delete_ofc_pf(self, context, pf_id):
-        self._raise_exc('delete_ofc_packet_filter')
-        del self.ofc_pfs[pf_id]

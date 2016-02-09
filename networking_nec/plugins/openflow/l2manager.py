@@ -25,9 +25,7 @@ from neutron.extensions import portbindings
 
 from networking_nec.i18n import _LE, _LI, _LW
 from networking_nec.plugins.openflow.db import api as ndb
-from networking_nec.plugins.openflow.db import router as rdb
 from networking_nec.plugins.openflow import exceptions as nexc
-from networking_nec.plugins.openflow import router as router_plugin
 from networking_nec.plugins.openflow import utils
 
 LOG = logging.getLogger(__name__)
@@ -40,13 +38,9 @@ class L2Manager(object):
 
         self.port_handlers = {
             'create': {
-                const.DEVICE_OWNER_ROUTER_GW: self.plugin.create_router_port,
-                const.DEVICE_OWNER_ROUTER_INTF: self.plugin.create_router_port,
                 'default': self.activate_port_if_ready,
             },
             'delete': {
-                const.DEVICE_OWNER_ROUTER_GW: self.plugin.delete_router_port,
-                const.DEVICE_OWNER_ROUTER_INTF: self.plugin.delete_router_port,
                 'default': self.deactivate_port,
             }
         }
@@ -67,13 +61,6 @@ class L2Manager(object):
         if deleting == 'network':
             net_count -= 1
         if net_count:
-            return True
-
-        router_count = rdb.get_router_count_by_provider(
-            context.session, router_plugin.PROVIDER_OPENFLOW, tenant_id)
-        if deleting == 'router':
-            router_count -= 1
-        if router_count:
             return True
 
         return False
@@ -248,10 +235,6 @@ class L2Manager(object):
                      in db_base_plugin_v2.AUTO_DELETE_PORT_OWNERS]:
             port = self.deactivate_port(context, port)
 
-        # delete all packet_filters of the network from the controller
-        for pf in net_db.packetfilters:
-            self.plugin.delete_packet_filter(context, pf['id'])
-
         if self.ofc.exists_ofc_network(context, id):
             try:
                 self.ofc.delete_ofc_network(context, id, net_db)
@@ -320,7 +303,6 @@ class L2Manager(object):
         # Determine it is required to update OFC port
         need_add = False
         need_del = False
-        need_packet_filter_update = False
 
         old_ofport_exist = self.get_ofport_exist(old_port)
         new_ofport_exist = self.get_ofport_exist(new_port)
@@ -337,16 +319,11 @@ class L2Manager(object):
                 need_del |= old_ofport_exist
             if portinfo_changed in ['ADD', 'MOD']:
                 need_add |= new_ofport_exist
-            need_packet_filter_update |= True
 
         # Update OFC port if required
         if need_del:
             self.deactivate_port(context, new_port)
-            if need_packet_filter_update:
-                self.plugin.deactivate_packet_filters_by_port(context, id)
         if need_add:
-            if need_packet_filter_update:
-                self.plugin.activate_packet_filters_by_port(context, id)
             self.activate_port_if_ready(context, new_port)
 
     def update_port(self, context, old_port, new_port):
@@ -363,9 +340,5 @@ class L2Manager(object):
         handler = self._get_port_handler('delete', port['device_owner'])
         # handler() raises an exception if an error occurs during processing.
         port = handler(context, port)
-
-        # delete all packet_filters of the port from the controller
-        for pf in port_db['packetfilters']:
-            self.plugin.delete_packet_filter(context, pf['id'])
 
         return port

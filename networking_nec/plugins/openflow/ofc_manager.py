@@ -12,11 +12,8 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import netaddr
 from oslo_config import cfg
 from oslo_log import log as logging
-
-from neutron.common import utils
 
 from networking_nec.plugins.openflow.db import api as ndb
 from networking_nec.plugins.openflow import drivers
@@ -93,15 +90,7 @@ class OFCManager(object):
         if not portinfo:
             raise nexc.PortInfoNotFound(id=port_id)
 
-        # Associate packet filters
-        filters = self.plugin.get_packet_filters_for_port(context, port)
-        if filters is not None:
-            params = {'filters': filters}
-        else:
-            params = {}
-
-        ofc_port_id = self.driver.create_port(ofc_net_id, portinfo, port_id,
-                                              **params)
+        ofc_port_id = self.driver.create_port(ofc_net_id, portinfo, port_id)
         self._add_ofc_item(context, "ofc_port", port_id, ofc_port_id)
 
     def exists_ofc_port(self, context, port_id):
@@ -111,73 +100,3 @@ class OFCManager(object):
         ofc_port_id = self._get_ofc_id(context, "ofc_port", port_id)
         self.driver.delete_port(ofc_port_id)
         self._del_ofc_item(context, "ofc_port", port_id)
-
-    def create_ofc_packet_filter(self, context, filter_id, filter_dict):
-        ofc_pf_id = self.driver.create_filter(context, filter_dict, filter_id)
-        self._add_ofc_item(context, "ofc_packet_filter", filter_id, ofc_pf_id)
-
-    def update_ofc_packet_filter(self, context, filter_id, filter_dict):
-        ofc_pf_id = self._get_ofc_id(context, "ofc_packet_filter", filter_id)
-        self.driver.update_filter(ofc_pf_id, filter_dict)
-
-    def exists_ofc_packet_filter(self, context, filter_id):
-        return self._exists_ofc_item(context, "ofc_packet_filter", filter_id)
-
-    def delete_ofc_packet_filter(self, context, filter_id):
-        ofc_pf_id = self._get_ofc_id(context, "ofc_packet_filter", filter_id)
-        self.driver.delete_filter(ofc_pf_id)
-        self._del_ofc_item(context, "ofc_packet_filter", filter_id)
-
-    def create_ofc_router(self, context, tenant_id, router_id, name=None):
-        ofc_tenant_id = self._get_ofc_id(context, "ofc_tenant", tenant_id)
-        desc = "ID=%s Name=%s at Neutron." % (router_id, name)
-        ofc_router_id = self.driver.create_router(ofc_tenant_id, router_id,
-                                                  desc)
-        self._add_ofc_item(context, "ofc_router", router_id, ofc_router_id)
-
-    def exists_ofc_router(self, context, router_id):
-        return self._exists_ofc_item(context, "ofc_router", router_id)
-
-    def delete_ofc_router(self, context, router_id, router):
-        ofc_router_id = self._get_ofc_id(context, "ofc_router", router_id)
-        self.driver.delete_router(ofc_router_id)
-        self._del_ofc_item(context, "ofc_router", router_id)
-
-    def add_ofc_router_interface(self, context, router_id, port_id, port):
-        # port must have the following fields:
-        #   network_id, cidr, ip_address, mac_address
-        ofc_router_id = self._get_ofc_id(context, "ofc_router", router_id)
-        ofc_net_id = self._get_ofc_id(context, "ofc_network",
-                                      port['network_id'])
-        ip_address = '%s/%s' % (port['ip_address'],
-                                netaddr.IPNetwork(port['cidr']).prefixlen)
-        mac_address = port['mac_address']
-        ofc_inf_id = self.driver.add_router_interface(
-            ofc_router_id, ofc_net_id, ip_address, mac_address)
-        # Use port mapping table to maintain an interface of OFC router
-        self._add_ofc_item(context, "ofc_port", port_id, ofc_inf_id)
-
-    def delete_ofc_router_interface(self, context, router_id, port_id):
-        # Use port mapping table to maintain an interface of OFC router
-        ofc_inf_id = self._get_ofc_id(context, "ofc_port", port_id)
-        self.driver.delete_router_interface(ofc_inf_id)
-        self._del_ofc_item(context, "ofc_port", port_id)
-
-    def update_ofc_router_route(self, context, router_id, new_routes):
-        ofc_router_id = self._get_ofc_id(context, "ofc_router", router_id)
-        ofc_routes = self.driver.list_router_routes(ofc_router_id)
-        route_dict = {}
-        cur_routes = []
-        for r in ofc_routes:
-            key = ','.join((r['destination'], r['nexthop']))
-            route_dict[key] = r['id']
-            del r['id']
-            cur_routes.append(r)
-        added, removed = utils.diff_list_of_dict(cur_routes, new_routes)
-        for r in removed:
-            key = ','.join((r['destination'], r['nexthop']))
-            route_id = route_dict[key]
-            self.driver.delete_router_route(route_id)
-        for r in added:
-            self.driver.add_router_route(ofc_router_id, r['destination'],
-                                         r['nexthop'])

@@ -61,22 +61,3 @@ class ProfilePortInfoInvalidDataPathId(qexc.InvalidInput):
 class ProfilePortInfoInvalidPortNo(qexc.InvalidInput):
     message = _('Invalid input for operation: '
                 'port_no should be [0:65535]')
-
-
-class RouterExternalGatewayNotSupported(qexc.BadRequest):
-    message = _("Router (provider=%(provider)s) does not support "
-                "an external network")
-
-
-class ProviderNotFound(qexc.NotFound):
-    message = _("Provider %(provider)s could not be found")
-
-
-class RouterOverLimit(qexc.Conflict):
-    message = _("Cannot create more routers with provider=%(provider)s")
-
-
-class RouterProviderMismatch(qexc.Conflict):
-    message = _("Provider of Router %(router_id)s is %(provider)s. "
-                "This operation is supported only for router provider "
-                "%(expected_provider)s.")

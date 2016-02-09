@@ -20,6 +20,7 @@ from oslo_utils import importutils
 from neutron.agent import securitygroups_rpc as sg_rpc
 from neutron.api import extensions as neutron_extensions
 from neutron.api.rpc.agentnotifiers import dhcp_rpc_agent_api
+from neutron.api.rpc.agentnotifiers import l3_rpc_agent_api
 from neutron.api.rpc.handlers import dhcp_rpc
 from neutron.api.rpc.handlers import l3_rpc
 from neutron.api.rpc.handlers import metadata_rpc
@@ -33,6 +34,9 @@ from neutron.db import agentschedulers_db
 from neutron.db import allowedaddresspairs_db as addr_pair_db
 from neutron.db import db_base_plugin_v2
 from neutron.db import external_net_db
+from neutron.db import extraroute_db
+from neutron.db import l3_agentschedulers_db
+from neutron.db import l3_gwmode_db
 from neutron.db import portbindings_base
 from neutron.db import quota_db  # noqa
 from neutron.extensions import allowedaddresspairs as addr_pair
@@ -41,9 +45,7 @@ from neutron.plugins.nec import extensions
 
 from networking_nec.plugins.openflow import l2manager
 from networking_nec.plugins.openflow import ofc_manager
-from networking_nec.plugins.openflow import packet_filter
 from networking_nec.plugins.openflow import portbindings as bindings
-from networking_nec.plugins.openflow import router as router_plugin
 from networking_nec.plugins.openflow import rpc
 
 LOG = logging.getLogger(__name__)
@@ -51,17 +53,19 @@ LOG = logging.getLogger(__name__)
 
 class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
                       external_net_db.External_net_db_mixin,
-                      router_plugin.RouterMixin,
+                      extraroute_db.ExtraRoute_db_mixin,
+                      l3_gwmode_db.L3_NAT_db_mixin,
                       rpc.SecurityGroupServerRpcMixin,
                       agentschedulers_db.DhcpAgentSchedulerDbMixin,
-                      router_plugin.L3AgentSchedulerDbMixin,
-                      packet_filter.PacketFilterMixin,
+                      l3_agentschedulers_db.L3AgentSchedulerDbMixin,
                       bindings.PortBindingMixin,
                       addr_pair_db.AllowedAddressPairsMixin):
 
     def setup_extension_aliases(self, aliases):
         sg_rpc.disable_security_group_extension_by_config(aliases)
-        self.remove_packet_filter_extension_if_disabled(aliases)
+        # In Kilo, supported_extension_aliases is defined in a plugin
+        # in neutron repository. Remove it to disable packet-filter ext.
+        aliases.remove('packet-filter')
 
     def __init__(self):
         super(NECPluginV2Impl, self).__init__()
@@ -73,7 +77,6 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
         neutron_extensions.append_api_extensions_path(extensions.__path__)
 
         self.setup_rpc()
-        self.l3_rpc_notifier = router_plugin.L3AgentNotifyAPI()
 
         self.network_scheduler = importutils.import_object(
             cfg.CONF.network_scheduler_driver
@@ -82,7 +85,6 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
             cfg.CONF.router_scheduler_driver
         )
 
-        router_plugin.load_driver(self.safe_reference, self.ofc)
         self.start_periodic_dhcp_agent_status_check()
 
     def setup_rpc(self):
@@ -94,7 +96,7 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
             dhcp_rpc_agent_api.DhcpAgentNotifyAPI()
         )
         self.agent_notifiers[const.AGENT_TYPE_L3] = (
-            router_plugin.L3AgentNotifyAPI()
+            l3_rpc_agent_api.L3AgentNotifyAPI()
         )
 
         # NOTE: callback_sg is referred to from the sg unit test.
@@ -133,7 +135,7 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
         """Update network and handle resources associated with the network.
 
         Update network entry on DB. If 'admin_state_up' was changed, activate
-        or deactivate ports and packetfilters associated with the network.
+        or deactivate ports.
         """
 
         session = context.session
@@ -149,11 +151,10 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
 
     @log_helpers.log_method_call
     def delete_network(self, context, id):
-        """Delete network and packet_filters associated with the network.
+        """Delete network.
 
-        Delete network entry from DB and OFC. Then delete packet_filters
-        associated with the network. If the network is the last resource
-        of the tenant, delete unnessary ofc_tenant.
+        Delete network entry from DB and OFC.If the network is the last
+        resource of the tenant, delete unnessary ofc_tenant.
         """
         ports = self.get_ports(context, filters={'network_id': [id]})
 
@@ -196,10 +197,10 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
 
     @log_helpers.log_method_call
     def update_port(self, context, id, port):
-        """Update port, and handle packetfilters associated with the port.
+        """Update port.
 
         Update network entry on DB. If admin_state_up was changed, activate
-        or deactivate the port and packetfilters associated with it.
+        or deactivate the port.
         """
         need_port_update_notify = False
         with context.session.begin(subtransactions=True):
@@ -225,7 +226,7 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
 
     @log_helpers.log_method_call
     def delete_port(self, context, id, l3_port_check=True):
-        """Delete port and packet_filters associated with the port."""
+        """Delete port"""
         # if needed, check to see if this is a port owned by
         # and l3-router.  If so, we should prevent deletion.
         if l3_port_check:
