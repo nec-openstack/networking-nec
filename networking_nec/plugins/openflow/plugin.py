@@ -66,6 +66,7 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
         # In Kilo, supported_extension_aliases is defined in a plugin
         # in neutron repository. Remove it to disable packet-filter ext.
         aliases.remove('packet-filter')
+        aliases.remove('router_provider')
 
     def __init__(self):
         super(NECPluginV2Impl, self).__init__()
