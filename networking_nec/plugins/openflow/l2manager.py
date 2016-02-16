@@ -257,68 +257,27 @@ class L2Manager(object):
 
     def create_port(self, context, port):
         handler = self._get_port_handler('create', port['device_owner'])
-        return handler(context, port)
+        port = handler(context, port)
+        return port
 
     @staticmethod
-    def get_portinfo(port):
-        profile = port.get(portbindings.PROFILE)
-        if not profile:
-            return
-        return {'datapath_id': profile['datapath_id'],
-                'port_no': profile['port_no']}
-
-    @staticmethod
-    def is_portinfo_changed(old_port, new_port):
-        """Check portinfo is changed or not.
-
-        :param old_port: old port information
-        :param new_port: new port information
-        :returns: 'ADD', 'MOD', 'DEL' or None
-        """
-        old_portinfo = L2Manager.get_portinfo(old_port)
-        new_portinfo = L2Manager.get_portinfo(new_port)
-
-        # portinfo has been validated, so we can assume
-        # portinfo is either None or a valid dict.
-        if not old_portinfo and not new_portinfo:
-            return
-        elif old_portinfo and not new_portinfo:
-            return 'DEL'
-        elif not old_portinfo and new_portinfo:
-            return 'ADD'
-        else:
-            if (utils.cmp_dpid(old_portinfo['datapath_id'],
-                               new_portinfo['datapath_id']) and
-                    old_portinfo['port_no'] == new_portinfo['port_no']):
-                return
-            else:
-                return 'MOD'
-
-    @staticmethod
-    def get_ofport_exist(port):
+    def get_ofport_exist(context, port):
         return (port['admin_state_up'] and
-                bool(port.get(portbindings.PROFILE)))
+                bool(ndb.get_portinfo(context.session, port['id'])))
 
     def _update_ofc_port_if_required(self, context, old_port, new_port):
         # Determine it is required to update OFC port
         need_add = False
         need_del = False
 
-        old_ofport_exist = self.get_ofport_exist(old_port)
-        new_ofport_exist = self.get_ofport_exist(new_port)
-        portinfo_changed = self.is_portinfo_changed(old_port, new_port)
+        old_ofport_exist = self.get_ofport_exist(context, old_port)
+        new_ofport_exist = self.get_ofport_exist(context, new_port)
 
         if old_port['admin_state_up'] != new_port['admin_state_up']:
             if new_port['admin_state_up']:
                 need_add |= new_ofport_exist
             else:
                 need_del |= old_ofport_exist
-
-        if portinfo_changed:
-            if portinfo_changed in ['DEL', 'MOD']:
-                need_del |= old_ofport_exist
-            if portinfo_changed in ['ADD', 'MOD']:
-                need_add |= new_ofport_exist
 
         # Update OFC port if required
         if need_del:

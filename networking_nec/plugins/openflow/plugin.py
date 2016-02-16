@@ -38,14 +38,15 @@ from neutron.db import extraroute_db
 from neutron.db import l3_agentschedulers_db
 from neutron.db import l3_gwmode_db
 from neutron.db import portbindings_base
+from neutron.db import portbindings_db
 from neutron.db import quota_db  # noqa
 from neutron.extensions import allowedaddresspairs as addr_pair
+from neutron.extensions import portbindings
 from neutron.plugins.common import constants as svc_constants
 from neutron.plugins.nec import extensions
 
 from networking_nec.plugins.openflow import l2manager
 from networking_nec.plugins.openflow import ofc_manager
-from networking_nec.plugins.openflow import portbindings as bindings
 from networking_nec.plugins.openflow import rpc
 
 LOG = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
                       rpc.SecurityGroupServerRpcMixin,
                       agentschedulers_db.DhcpAgentSchedulerDbMixin,
                       l3_agentschedulers_db.L3AgentSchedulerDbMixin,
-                      bindings.PortBindingMixin,
+                      portbindings_db.PortBindingMixin,
                       addr_pair_db.AllowedAddressPairsMixin):
 
     def setup_extension_aliases(self, aliases):
@@ -87,6 +88,14 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
         )
 
         self.start_periodic_dhcp_agent_status_check()
+
+    def _get_base_binding_dict(self):
+        sg_enabled = sg_rpc.is_firewall_enabled()
+        vif_details = {portbindings.CAP_PORT_FILTER: sg_enabled,
+                       portbindings.OVS_HYBRID_PLUG: sg_enabled}
+        binding = {portbindings.VIF_TYPE: portbindings.VIF_TYPE_OVS,
+                   portbindings.VIF_DETAILS: vif_details}
+        return binding
 
     def setup_rpc(self):
         self.service_topics = {svc_constants.CORE: topics.PLUGIN,
@@ -186,7 +195,8 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
             self._ensure_default_security_group_on_port(context, port)
             sgids = self._get_security_groups_on_port(context, port)
             new_port = super(NECPluginV2Impl, self).create_port(context, port)
-            self._process_portbindings_create(context, port_data, new_port)
+            self._process_portbindings_create_and_update(context, port_data,
+                                                         new_port)
             self._process_port_create_security_group(
                 context, new_port, sgids)
             new_port[addr_pair.ADDRESS_PAIRS] = (
@@ -208,7 +218,8 @@ class NECPluginV2Impl(db_base_plugin_v2.NeutronDbPluginV2,
             old_port = super(NECPluginV2Impl, self).get_port(context, id)
             new_port = super(NECPluginV2Impl, self).update_port(context,
                                                                 id, port)
-            self._process_portbindings_update(context, port['port'], new_port)
+            self._process_portbindings_create_and_update(context, port['port'],
+                                                         new_port)
             if addr_pair.ADDRESS_PAIRS in port['port']:
                 need_port_update_notify |= (
                     self.update_address_pairs_on_port(context, id, port,
